@@ -19,6 +19,57 @@
         <span>W/S o ↑/↓: mover • Barra espaciadora: pausa • R: reiniciar</span>
       </div>
     </div>
+    <div class="overlay" id="menu">
+      <div class="panel">
+        <h1>Pong</h1>
+        <div class="row">
+          <label for="mode">Modo</label>
+          <select id="mode">
+            <option value="classic" selected>Clásico (a N puntos)</option>
+            <option value="time">Contra reloj</option>
+          </select>
+        </div>
+        <div class="row">
+          <label for="map-obstacle">Obstáculo central</label>
+          <input id="map-obstacle" type="checkbox" />
+        </div>
+        <div class="row">
+          <label for="powerups">Power-ups</label>
+          <select id="powerups">
+            <option value="off">Desactivados</option>
+            <option value="basic" selected>Básicos (XL y Slow)</option>
+          </select>
+        </div>
+        <div class="row" data-mode="classic">
+          <label for="target">Puntos para ganar</label>
+          <input id="target" type="number" min="1" max="50" value="7" />
+        </div>
+        <div class="row" data-mode="time" style="display:none;">
+          <label for="duration">Duración (seg)</label>
+          <input id="duration" type="number" min="15" max="600" value="120" />
+        </div>
+        <div class="row">
+          <label for="difficulty">Dificultad CPU</label>
+          <select id="difficulty">
+            <option value="easy">Lento</option>
+            <option value="normal" selected>Normal</option>
+            <option value="hard">Rápido</option>
+          </select>
+        </div>
+        <button id="start">Comenzar</button>
+      </div>
+    </div>
+
+    <div class="overlay" id="gameover" style="display:none;">
+      <div class="panel">
+        <h2 id="result-title">Fin de la partida</h2>
+        <p id="result-sub"></p>
+        <div class="actions">
+          <button id="restart">Reiniciar</button>
+          <button id="back-to-menu">Menú</button>
+        </div>
+      </div>
+    </div>
   </div>
   <script src="main.js"></script>
   
