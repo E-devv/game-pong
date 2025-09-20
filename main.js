@@ -13,6 +13,8 @@
   const targetInput = document.getElementById('target');
   const durationInput = document.getElementById('duration');
   const mapObstacleInput = document.getElementById('map-obstacle');
+  const mapPortalsInput = document.getElementById('map-portals');
+  const mapZonesInput = document.getElementById('map-zones');
   const powerupsSel = document.getElementById('powerups');
 
   const FIELD = { width: canvas.width, height: canvas.height, centerX: canvas.width / 2, centerY: canvas.height / 2 };
@@ -20,7 +22,15 @@
 
   const PADDLE = { width: 12, height: 80, speed: 340 };
   const BALL = { radius: 7, speed: 320, speedMax: 520, accelOnHit: 1.05 };
-  const map = { obstacle: false, rect: { x: 0, y: 0, w: 18, h: 120 } };
+  const map = { 
+    obstacle: false, 
+    rect: { x: 0, y: 0, w: 18, h: 120 },
+    portals: false,
+    portalLeft: { x: 60, y: FIELD.centerY, radius: 20 },
+    portalRight: { x: FIELD.width - 60, y: FIELD.centerY, radius: 20 },
+    zones: false,
+    zonesList: []
+  };
 
   let left = { x: 24, y: FIELD.centerY - PADDLE.height / 2, vy: 0, score: 0 };
   let right = { x: FIELD.width - 24 - PADDLE.width, y: FIELD.centerY - PADDLE.height / 2, vy: 0, score: 0 };
@@ -87,6 +97,46 @@
     ctx.fillRect(x, y, r.w, r.h);
   }
 
+  function drawPortals() {
+    if (!map.portals) return;
+    // Portal izquierdo
+    ctx.save();
+    ctx.fillStyle = '#9c27b0';
+    ctx.beginPath();
+    ctx.arc(map.portalLeft.x, map.portalLeft.y, map.portalLeft.radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#e1bee7';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+    
+    // Portal derecho
+    ctx.save();
+    ctx.fillStyle = '#ff9800';
+    ctx.beginPath();
+    ctx.arc(map.portalRight.x, map.portalRight.y, map.portalRight.radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#ffcc80';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawZones() {
+    if (!map.zones) return;
+    for (const zone of map.zonesList) {
+      ctx.save();
+      ctx.globalAlpha = 0.3;
+      ctx.fillStyle = zone.type === 'boost' ? '#4caf50' : '#f44336';
+      ctx.fillRect(zone.x, zone.y, zone.w, zone.h);
+      ctx.globalAlpha = 0.7;
+      ctx.strokeStyle = zone.type === 'boost' ? '#8bc34a' : '#ef5350';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(zone.x, zone.y, zone.w, zone.h);
+      ctx.restore();
+    }
+  }
+
   function drawRect(x, y, w, h, color) {
     ctx.fillStyle = color;
     ctx.fillRect(x, y, w, h);
@@ -102,7 +152,9 @@
   function render() {
     ctx.clearRect(0, 0, FIELD.width, FIELD.height);
     if (!map.obstacle) drawNet();
+    drawZones();
     drawObstacle();
+    drawPortals();
     drawRect(left.x, left.y, PADDLE.width, PADDLE.height, COLORS.paddle);
     drawRect(right.x, right.y, PADDLE.width, PADDLE.height, COLORS.paddle);
     drawCircle(ball.x, ball.y, BALL.radius, COLORS.ball);
@@ -151,8 +203,9 @@
 
     // move ball
     let slowFactor = getSlowFactor();
-    ball.x += ball.vx * dt * slowFactor;
-    ball.y += ball.vy * dt * slowFactor;
+    let zoneFactor = getZoneFactor(ball.x, ball.y);
+    ball.x += ball.vx * dt * slowFactor * zoneFactor;
+    ball.y += ball.vy * dt * slowFactor * zoneFactor;
 
     // wall collisions
     if (ball.y - BALL.radius <= 0 && ball.vy < 0) {
@@ -225,6 +278,37 @@
           ball.y += (fromTop || (!fromBottom && Math.abs(penTop) > Math.abs(penBottom))) ? -Math.abs(corrY) : Math.abs(corrY);
           ball.vy *= -1;
         }
+      }
+    }
+
+    // portal collision
+    if (map.portals) {
+      // Portal izquierdo
+      const dxL = ball.x - map.portalLeft.x;
+      const dyL = ball.y - map.portalLeft.y;
+      const distL = Math.sqrt(dxL * dxL + dyL * dyL);
+      if (distL <= map.portalLeft.radius + BALL.radius) {
+        // Teletransportar al portal derecho con rotación
+        ball.x = map.portalRight.x;
+        ball.y = map.portalRight.y;
+        // Rotar velocidad 90 grados
+        const tempVx = ball.vx;
+        ball.vx = -ball.vy;
+        ball.vy = tempVx;
+      }
+      
+      // Portal derecho
+      const dxR = ball.x - map.portalRight.x;
+      const dyR = ball.y - map.portalRight.y;
+      const distR = Math.sqrt(dxR * dxR + dyR * dyR);
+      if (distR <= map.portalRight.radius + BALL.radius) {
+        // Teletransportar al portal izquierdo con rotación
+        ball.x = map.portalLeft.x;
+        ball.y = map.portalLeft.y;
+        // Rotar velocidad -90 grados
+        const tempVx = ball.vx;
+        ball.vx = ball.vy;
+        ball.vy = -tempVx;
       }
     }
 
@@ -327,6 +411,25 @@
     return hasSlow ? 0.6 : 1;
   }
 
+  function getZoneFactor(x, y) {
+    if (!map.zones) return 1;
+    for (const zone of map.zonesList) {
+      if (x >= zone.x && x <= zone.x + zone.w && y >= zone.y && y <= zone.y + zone.h) {
+        return zone.type === 'boost' ? 1.4 : 0.6;
+      }
+    }
+    return 1;
+  }
+
+  function initZones() {
+    map.zonesList = [
+      { x: 100, y: 50, w: 80, h: 60, type: 'boost' },
+      { x: FIELD.width - 180, y: 50, w: 80, h: 60, type: 'friction' },
+      { x: 100, y: FIELD.height - 110, w: 80, h: 60, type: 'friction' },
+      { x: FIELD.width - 180, y: FIELD.height - 110, w: 80, h: 60, type: 'boost' }
+    ];
+  }
+
   function loop(ts) {
     if (lastTs === undefined) lastTs = ts;
     const dt = Math.min(0.033, (ts - lastTs) / 1000);
@@ -383,6 +486,9 @@
     gameMode.type = modeSel.value;
     difficulty = difficultySel.value;
     map.obstacle = !!(mapObstacleInput && mapObstacleInput.checked);
+    map.portals = !!(mapPortalsInput && mapPortalsInput.checked);
+    map.zones = !!(mapZonesInput && mapZonesInput.checked);
+    if (map.zones) initZones();
     powerups.enabled = powerupsSel ? (powerupsSel.value !== 'off') : false;
     powerups.list = []; powerups.active = []; powerups.spawnTimer = 2.5;
     if (gameMode.type === 'classic') {
